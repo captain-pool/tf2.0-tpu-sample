@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.python.tpu import tpu_estimator
 from tensorflow.python.tpu import tpu_optimizer
+from tensorflow.python.tpu import tpu_config
 from functools import partial
 from absl import flags, app
 
