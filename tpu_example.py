@@ -4,10 +4,15 @@ import tensorflow_datasets as tfds
 from tensorflow.python.tpu import tpu_estimator
 from tensorflow.python.tpu import tpu_optimizer
 from functools import partial
+from absl import flags, app
 
+FLAGS = flags.FLAGS
+flags.DEFINE_string("tpu", None, "TPU Address")
+flags.DEFINE_integer("iterations",2, "Number of Itertions")
+flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
+flags.DEFINE_boolean("use_tpu", True, " Use TPU")
+flags.DEFINE_string("model_dir", "mnist/", "Directory to Save the Models and Checkpoint")
 
-use_tpu = True
-iterations = 2
 class MNIST(tf.keras.Model):
     def __init__(self, params):
         super(MNIST, self).__init__()
@@ -42,7 +47,7 @@ class MNIST(tf.keras.Model):
         return o
 
 
-def input_fn(mode, batch_size):
+def input_(mode, batch_size, iterations):
 
     dataset = tfds.load(
         "mnist",
@@ -65,7 +70,7 @@ def model_fn(features, labels, mode, params):
     optimizer = None
     if mode == tf.estimator.ModeKeys.TRAIN:
         optimizer = tf.optimizers.Adam(params.get("learing_rate", 1e-3))
-        if use_tpu:
+        if params.get("use_tpu", True):
           optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
     with tf.GradientTape() as tape:
@@ -93,24 +98,29 @@ def model_fn(features, labels, mode, params):
     if mode == tf.estimator.ModeKeys.TRAIN:
         return tpu_estimator.TPUEstimatorSpec(mode, loss=loss, train_op=train_fn())
 
+def main(_):
+  input_fn = partial(input_, batch_size=FLAGS.batch_size, iterations=FLAGS.iterations)
+  cluster = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=FLAGS.tpu)
+  run_config =  tpu_config.RunConfig(
+    model_dir = FLAGS.model_dir,
+    cluster=cluster,
+    tpu_config=tpu_config.TPUConfig(FLAGS.iterations))
 
-input_fn = partial(input_fn, batch_size=10)
-cluster = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=tpu)
-run_config =  tpu_config.RunConfig(
-  model_dir = "mnist/",
-  cluster=cluster,
-  tpu_config=tpu_config.TPUConfig(iterations))
-
-classifier = tpu_estimator.TPUEstimator(
-  model_fn=model_fn,
-  use_tpu=use_tpu,
-  train_batch_size=10,
-  eval_batch_size=10,
-  config=run_config
-)
-# classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
-tf.estimator.train_and_evaluate(
-    classifier,
-    train_spec=tf.estimator.TrainSpec(input_fn=input_fn),
-    eval_spec=tf.estimator.EvalSpec(input_fn=input_fn)
-)
+  classifier = tpu_estimator.TPUEstimator(
+    model_fn=model_fn,
+    use_tpu=FLAGS.use_tpu,
+    train_batch_size=10,
+    eval_batch_size=10,
+    config=run_config,
+    params={
+      "use_tpu": FLAGS.use_tpu,
+    }
+  )
+  # classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
+  tf.estimator.train_and_evaluate(
+      classifier,
+      train_spec=tf.estimator.TrainSpec(input_fn=input_fn),
+      eval_spec=tf.estimator.EvalSpec(input_fn=input_fn)
+  )
+if __name__ == "__main__":
+  app.run(main)
