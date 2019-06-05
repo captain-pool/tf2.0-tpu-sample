@@ -48,7 +48,7 @@ class MNIST(tf.keras.Model):
         return o
 
 
-def input_(mode, batch_size, iterations):
+def input_(mode, batch_size, iterations, **kwargs):
 
     dataset = tfds.load(
         "mnist",
@@ -100,7 +100,7 @@ def model_fn(features, labels, mode, params):
         return tpu_estimator.TPUEstimatorSpec(mode, loss=loss, train_op=train_fn())
 
 def main(_):
-  input_fn = partial(input_, batch_size=FLAGS.batch_size, iterations=FLAGS.iterations)
+  input_fn = partial(input_, iterations=FLAGS.iterations)
   cluster = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=FLAGS.tpu)
   run_config =  tpu_config.RunConfig(
     model_dir = FLAGS.model_dir,
@@ -110,18 +110,20 @@ def main(_):
   classifier = tpu_estimator.TPUEstimator(
     model_fn=model_fn,
     use_tpu=FLAGS.use_tpu,
-    train_batch_size=10,
-    eval_batch_size=10,
+    train_batch_size=FLAGS.batch_size,
+    eval_batch_size=FLAGS.batch_size,
     config=run_config,
     params={
       "use_tpu": FLAGS.use_tpu,
     }
   )
   # classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
-  tf.estimator.train_and_evaluate(
-      classifier,
-      train_spec=tf.estimator.TrainSpec(input_fn=input_fn),
-      eval_spec=tf.estimator.EvalSpec(input_fn=input_fn)
-  )
+  #tf.estimator.train_and_evaluate(
+  #    classifier,
+  #    train_spec=tf.estimator.TrainSpec(input_fn=input_fn),
+  #    eval_spec=tf.estimator.EvalSpec(input_fn=input_fn),
+  #    max_steps=3000
+  #)
+  classifier.train(input_fn=lambda params:input_fn(mode=tf.estimator.ModeKeys.TRAIN,**params), max_steps=2000).evaluate(input_fn=lambda params:input_fn(mode=tf.estimator.ModeKeys.EVAL, **params), max_steps=1000)
 if __name__ == "__main__":
   app.run(main)
