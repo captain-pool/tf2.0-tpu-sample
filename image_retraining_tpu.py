@@ -19,8 +19,9 @@ flags.DEFINE_string("dataset",
             "TFDS Dataset Name. IMAGE Dimension should be >= 224, channel=3")
 flags.DEFINE_string("data_dir", None, "Directory to Save Data to")
 NUM_CLASSES = None
+FEATURE_SHAPE = None
 def input_(mode, batch_size, iterations, **kwargs):
-    global NUM_CLASSES
+    global NUM_CLASSES, FEATURE_SHAPE
     dataset, info = tfds.load(
         kwargs["dataset"],
         as_supervised=True,
@@ -29,6 +30,7 @@ def input_(mode, batch_size, iterations, **kwargs):
         data_dir=kwargs['data_dir']
         )
     NUM_CLASSES = info.features['label'].num_classes
+    FEATURE_SHAPE = info.features['image'].shape
     def resize_and_scale(image, label):
         image = tf.image.resize(image, size=[224, 224])
         image = tf.cast(image, tf.float32)
@@ -40,7 +42,12 @@ def input_(mode, batch_size, iterations, **kwargs):
         1000).repeat(iterations).batch(batch_size, drop_remainder=True)
     return dataset
 
-
+def serving_reciever_input_fn():
+    global FEATURE_SHAPE
+    assert FEATURE_SHAPE is not None
+    feature = tf.compat.v1.placeholder(tf.float32, shape=[None] + FEATURE_SHAPE, name="input")
+    reciever_tensor = {"input": feature}
+    return tf.estimator.export.ServingInputReciver(feature, reciever_tensor)
 def model_fn(features, labels, mode, params):
     global NUM_CLASSES
     assert NUM_CLASSES is not None
@@ -108,10 +115,11 @@ def main(_):
           input_fn=lambda params:input_fn(
               mode=tf.estimator.ModeKeys.TRAIN,
               **params),
-          max_steps=2000)#.evaluate(
+          max_steps=1000)#.evaluate(
                   #input_fn=lambda params:input_fn(
                   #    mode=tf.estimator.ModeKeys.EVAL,
                   #    **params),
                   #steps=1000)
+  classifier.export_savedmodel(os.path.join(FLAGS.model_dir,"export"), serving_reciever_input_fn)
 if __name__ == "__main__":
   app.run(main)
