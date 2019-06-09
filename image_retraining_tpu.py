@@ -14,7 +14,7 @@ flags.DEFINE_integer("iterations",2, "Number of Itertions")
 flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
 flags.DEFINE_string("model_dir", "tf_flowers/", "Directory to Save the Models and Checkpoint")
-
+flags.DEFINE_string("data_dir", None, "Directory to Save Data to")
 NUM_CLASSES = None
 def input_(mode, batch_size, iterations, **kwargs):
     global NUM_CLASSES
@@ -71,8 +71,7 @@ def model_fn(features, labels, mode, params):
         global_step = tf.compat.v1.train.get_global_step()
         update_global_step = tf.compat.v1.assign(global_step, global_step + 1, name='update_global_step')
         with tf.control_dependencies([update_global_step]):
-          apply_grads = optimizer.apply_gradients(
-              zip(gradient, model.trainable_variables))
+          apply_grads = optimizer.apply_gradients(zip(gradient, model.trainable_variables))
         return apply_grads
 
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -94,6 +93,7 @@ def main(_):
     config=run_config,
     params={
       "use_tpu": FLAGS.use_tpu,
+      "data_dir": FLAGS.data_dir
     }
   )
   # classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
@@ -103,6 +103,14 @@ def main(_):
   #    eval_spec=tf.estimator.EvalSpec(input_fn=input_fn),
   #    max_steps=3000
   #)
-  classifier.train(input_fn=lambda params:input_fn(mode=tf.estimator.ModeKeys.TRAIN,**params), max_steps=2000).evaluate(input_fn=lambda params:input_fn(mode=tf.estimator.ModeKeys.EVAL, **params), max_steps=1000)
+  classifier.train(
+          input_fn=lambda params:input_fn(
+              mode=tf.estimator.ModeKeys.TRAIN,
+              **params),
+          max_steps=2000)#.evaluate(
+                  #input_fn=lambda params:input_fn(
+                  #    mode=tf.estimator.ModeKeys.EVAL,
+                  #    **params),
+                  #steps=1000)
 if __name__ == "__main__":
   app.run(main)
