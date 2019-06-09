@@ -24,7 +24,7 @@ def input_(mode, batch_size, iterations, **kwargs):
     dataset, info = tfds.load(
         kwargs["dataset"],
         as_supervised=True,
-        split="train" if mode == tf.estimators.ModeKeys.TRAIN else "test",
+        split="train" if mode == tf.estimator.ModeKeys.TRAIN else "test",
         with_info=True,
         data_dir=kwargs['data_dir']
         )
