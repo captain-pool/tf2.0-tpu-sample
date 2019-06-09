@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
+import tensorflow_hub as hub
 from tensorflow.python.tpu import tpu_estimator
 from tensorflow.python.tpu import tpu_optimizer
 from tensorflow.python.tpu import tpu_config
@@ -12,62 +13,40 @@ flags.DEFINE_string("tpu", None, "TPU Address")
 flags.DEFINE_integer("iterations",2, "Number of Itertions")
 flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
-flags.DEFINE_string("model_dir", "mnist/", "Directory to Save the Models and Checkpoint")
+flags.DEFINE_string("model_dir", "tf_flowers/", "Directory to Save the Models and Checkpoint")
 
-class MNIST(tf.keras.Model):
-    def __init__(self, params):
-        super(MNIST, self).__init__()
-        self.layer_1 = tf.keras.layers.Dense(
-            params.get(
-                'layer_1', 128), activation=params.get(
-                'layer_1_activation', "linear"))
-        self.layer_2 = tf.keras.layers.Dense(
-            params.get(
-                'layer_2', 128), activation=params.get(
-                'layer_2_activation', "linear"))
-        self.out = tf.keras.layers.Dense(params.get(
-            'num_classes', 10), activation="softmax")
-
-    @tf.function(
-        input_signature=[
-            tf.TensorSpec(
-                shape=[
-                    None,
-                    28,
-                    28,
-                    1],
-                dtype=tf.float32)])
-    def call(self, inputs, training=True):
-        x = tf.keras.layers.Flatten()(inputs)
-        x = self.layer_1(x)
-        x.trainable = training
-        x = self.layer_2(x)
-        x.trainable = training
-        o = self.out(x)
-        o.trainable = training
-        return o
-
-
+NUM_CLASSES = None
 def input_(mode, batch_size, iterations, **kwargs):
-
-    dataset = tfds.load(
-        "mnist",
+    global NUM_CLASSES
+    dataset, info = tfds.load(
+        "tf_flowers",
         as_supervised=True,
-        split="train" if mode == tf.estimator.ModeKeys.TRAIN else "test")
-
-    def scale(image, label):
+        split="train",
+        with_info=True
+        )
+    NUM_CLASSES = info.features['label'].num_classes
+    def resize_and_scale(image, label):
+        image = tf.image.resize(image, size=[224, 224])
         image = tf.cast(image, tf.float32)
-        image = image / tf.reduce_max(image)
-#    label = tf.one_hot(label, 10)
+        image = image / tf.reduce_max(tf.gather(image, 0))
+#        label = tf.one_hot(label, info.features['label'].num_classes)
         return image, label
 
-    dataset = dataset.map(scale).shuffle(
+    dataset = dataset.map(resize_and_scale).shuffle(
         1000).repeat(iterations).batch(batch_size, drop_remainder=True)
     return dataset
 
 
 def model_fn(features, labels, mode, params):
-    model = MNIST(params)
+    global NUM_CLASSES
+    assert NUM_CLASSES is not None
+    model = tf.keras.Sequential([
+      hub.KerasLayer("https://tfhub.dev/google/tf2-preview/inception_v3/feature_vector/4",
+        output_shape=[2048],
+        trainable=False
+      ),
+      tf.keras.layers.Dense(NUM_CLASSES, activation="softmax")
+    ])
     optimizer = None
     if mode == tf.estimator.ModeKeys.TRAIN:
         optimizer = tf.optimizers.Adam(params.get("learing_rate", 1e-3))
