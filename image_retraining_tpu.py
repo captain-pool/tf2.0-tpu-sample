@@ -13,15 +13,18 @@ flags.DEFINE_string("tpu", None, "TPU Address")
 flags.DEFINE_integer("iterations",2, "Number of Itertions")
 flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
-flags.DEFINE_string("model_dir", "tf_flowers/", "Directory to Save the Models and Checkpoint")
+flags.DEFINE_string("model_dir", "model_dir/", "Directory to Save the Models and Checkpoint")
+flags.DEFINE_string("dataset",
+            "horses_or_humans",
+            "TFDS Dataset Name. IMAGE Dimension should be >= 224, channel=3")
 flags.DEFINE_string("data_dir", None, "Directory to Save Data to")
 NUM_CLASSES = None
 def input_(mode, batch_size, iterations, **kwargs):
     global NUM_CLASSES
     dataset, info = tfds.load(
-        "tf_flowers",
+        kwargs["dataset"],
         as_supervised=True,
-        split="train",
+        split="train" if mode == tf.estimators.ModeKeys.TRAIN else "test",
         with_info=True,
         data_dir=kwargs['data_dir']
         )
@@ -94,7 +97,8 @@ def main(_):
     config=run_config,
     params={
       "use_tpu": FLAGS.use_tpu,
-      "data_dir": FLAGS.data_dir
+      "data_dir": FLAGS.data_dir,
+      "dataset": FLAGS.dataset
     }
   )
   # classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
