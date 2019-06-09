@@ -82,6 +82,8 @@ def model_fn(features, labels, mode, params):
         return tpu_estimator.TPUEstimatorSpec(mode, loss=loss, train_op=train_fn())
 
 def main(_):
+  os.environ["TFHUB_CACHE_DIR"] = os.path.join(FLAGS.model_dir,"tfhub_modules")
+  os.environ["TFHUB_DOWNLOAD_PROGRESS"] = True
   input_fn = partial(input_, iterations=FLAGS.iterations)
   cluster = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=FLAGS.tpu)
   run_config =  tpu_config.RunConfig(
@@ -101,13 +103,7 @@ def main(_):
       "dataset": FLAGS.dataset
     }
   )
-  # classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="mnist/")
-  #tf.estimator.train_and_evaluate(
-  #    classifier,
-  #    train_spec=tf.estimator.TrainSpec(input_fn=input_fn),
-  #    eval_spec=tf.estimator.EvalSpec(input_fn=input_fn),
-  #    max_steps=3000
-  #)
+
   classifier.train(
           input_fn=lambda params:input_fn(
               mode=tf.estimator.ModeKeys.TRAIN,
