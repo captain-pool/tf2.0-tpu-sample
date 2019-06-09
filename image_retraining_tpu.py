@@ -83,7 +83,7 @@ def model_fn(features, labels, mode, params):
 
 def main(_):
   os.environ["TFHUB_CACHE_DIR"] = os.path.join(FLAGS.model_dir,"tfhub_modules")
-  os.environ["TFHUB_DOWNLOAD_PROGRESS"] = True
+  os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
   input_fn = partial(input_, iterations=FLAGS.iterations)
   cluster = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=FLAGS.tpu)
   run_config =  tpu_config.RunConfig(
