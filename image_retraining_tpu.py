@@ -22,7 +22,8 @@ def input_(mode, batch_size, iterations, **kwargs):
         "tf_flowers",
         as_supervised=True,
         split="train",
-        with_info=True
+        with_info=True,
+        data_dir=kwargs['data_dir']
         )
     NUM_CLASSES = info.features['label'].num_classes
     def resize_and_scale(image, label):
